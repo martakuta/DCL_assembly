@@ -28,13 +28,6 @@ new_line db `\n`
 
 section .text
 
-wczytaj_znak:
-        mov     rax, SYS_READ
-        mov     rdi, STDIN
-        mov     rdx, 1
-        syscall
-        ret
-
 wczytaj_60_znakow_tekstu:
         mov     rax, SYS_READ
         mov     rdi, STDIN
@@ -49,16 +42,6 @@ wypisz_szyfrogram:
         mov     rdi, STDOUT
         mov     rsi, szyfrogram
         syscall
-        ret
-
-wypisz_permutacje:
-        mov     rax, SYS_WRITE
-        mov     rdi, STDOUT
-        mov     rdx, SIGNS
-        syscall
-
-        mov     rsi, new_line           ; Wypisz znak nowej linii.
-        call    wypisz_znak
         ret
 
 wypisz_znak:
@@ -81,11 +64,11 @@ zeruj_tablice:
         mov     [r9 + r8], dl           ; pod dl jest 0
         add     r8, 1
         mov     al, [r9 + r8]
-        cmp     al, 0                 ; porównuję czy to ostatni znak
+        cmp     al, 0                   ; porównuję czy to ostatni znak
         jne     zeruj_tablice
         ret
 
-sprawdz_tablice_t:
+sprawdz_tablice_t:                      ; sprawdza czy TT jest identycznością
         mov     dl, [r10 + r8]          ; biorę to na co wskazuje id (np. 1 --> K)
         sub     rdx, 49
         cmp     rdx, r8                 ; sprawdzam czy to nie jest cykl 1-elementowy
@@ -202,20 +185,20 @@ ustaw_bebenki:
         ret
 
 permutuj_Q:
-        add     al, dl                  ; permutacja Q
+        add     al, dl                  ; permutacja Q, jej indeks dolny jest w dl
         sub     al, 49
         cmp     al, 90
         ja      modulo_al
         ret
 
 permutuj_Q_minus:
-        add     al, 49                  ; permutacja Q
+        add     al, 49                  ; permutacja Q_-1, jej indeks dolny jest w dl
         sub     al, dl
         cmp     al, 49
         jb      modulo_al_minus
         ret
 
-permutuj_LRT:
+permutuj_LRT:                           ; permutacja L, R lub T, jest zawarta w rdx
         mov     cl, [rdx + rax - 49]
         mov     al, cl
         ret
@@ -289,7 +272,7 @@ wczytuj_porcje:
 
         ret
 
-szyfruj:       
+szyfruj:                                ; przygotowuje parametry do szyfrowania
         push    r12
         push    r13
         xor     r12, r12
@@ -311,7 +294,7 @@ szyfruj:
 
         ret
 
-petla_szyfruj:
+petla_szyfruj:                          ; szyfruje w pętli kolejne litery
         xor     rax, rax
         mov     al, [r10 + r13]
 
