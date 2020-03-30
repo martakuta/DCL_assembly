@@ -35,17 +35,16 @@ wczytaj_znak:
         syscall
         ret
 
-wczytaj_64_znaki_tekstu:
+wczytaj_60_znakow_tekstu:
         mov     rax, SYS_READ
         mov     rdi, STDIN
-        mov     rdx, 64
+        mov     rdx, 60
         mov     rsi, tekst
         syscall
         ret
 
 wypisz_szyfrogram:
-        
-        mov     rdx, 42
+        mov     rdx, 64
         mov     rax, SYS_WRITE
         mov     rdi, STDOUT
         mov     rsi, szyfrogram
@@ -81,7 +80,8 @@ sprawdz_znak:
 zeruj_tablice:
         mov     [r9 + r8], dl           ; pod dl jest 0
         add     r8, 1
-        cmp     r8, rdi                 ; porównuję czy to ostatni znak
+        mov     al, [r9 + r8]
+        cmp     al, 0                 ; porównuję czy to ostatni znak
         jne     zeruj_tablice
         ret
 
@@ -220,7 +220,7 @@ permutuj_LRT:
         mov     al, cl
         ret
 
-szyfruj_znak:
+szyfruj_znak:                           ; szyfruje znak zawarty w rejestrze al
         mov     dl, r9b
         call    permutuj_Q
 
@@ -251,7 +251,6 @@ szyfruj_znak:
         mov     dl, r8b
         call    permutuj_Q_minus
 
-    
         mov     dl, r9b
         call    permutuj_Q
 
@@ -263,28 +262,49 @@ szyfruj_znak:
 
         ret
 
-szyfruj:
-        call    wczytaj_64_znaki_tekstu
+wczytuj_porcje:
+        call    wczytaj_60_znakow_tekstu
+        call    szyfruj
+        call    wypisz_szyfrogram
 
         cld                             ; Zwiększaj indeks przy przeszukiwaniu napisu.
         xor     al, al                  ; Szukaj zera.
-        mov     ecx, SIGNS+3            ; Ogranicz przeszukiwanie do SIGNS+3 znaków.
-        mov     rdi, rsi                ; Ustaw adres, od którego rozpocząć szukanie.
+        mov     ecx, 64                 ; Ogranicz przeszukiwanie do SIGNS+3 znaków.
+        mov     rdi, szyfrogram         ; Ustaw adres, od którego rozpocząć szukanie.
         repne \
         scasb                           ; Szukaj bajtu o wartości zero.
-        sub     rdi, rsi                ; ile bajtów - w rdi był adres znaku konca, a w rsi poczatku
+        sub     rdi, szyfrogram     
+
+        mov     r9, szyfrogram
+        xor     r8, r8
+        xor     dl, dl
+        call    zeruj_tablice
+        mov     r9, tekst
+        xor     r8, r8
+        xor     dl, dl
+        call    zeruj_tablice
+        
+        cmp     rdi, 60
+        jae     wczytuj_porcje
+
+        ret
+
+szyfruj:       
         push    r12
         push    r13
+        xor     r12, r12
         mov     r12, rdi
+        xor     r13, r13
 
         xor     r8, r8
         xor     r9, r9
+        xor     r10, r10
+        xor     r11, r11
         mov     r8b, [klucz_l]
         mov     r9b, [klucz_r]
         mov     r10, tekst
         mov     r11, szyfrogram
 
-        xor     r13, r13
         call    petla_szyfruj
         pop     r13
         pop     r12
@@ -302,7 +322,8 @@ petla_szyfruj:
         mov     [r11 + r13], al
 
         add     r13, 1
-        cmp     r13, r12
+        mov     al, [r10 + r13]
+        cmp     al, 0
         jne     petla_szyfruj
         ret
 
@@ -339,12 +360,11 @@ _start:
         mov     rsi, [rsp+40]           ; mam teraz arg4 w rsi
         call    przepisz_klucze
 
-        call    szyfruj                 ; wczytuje w blokach i (de)szyfruje tekst
+        call    wczytuj_porcje          ; wczytuje w blokach i (de)szyfruje tekst
 
-        call    wypisz_szyfrogram      ; wypisz szyfrogram
-
-        mov     rsi, new_line          ; Wypisz znak nowej linii.
+        mov     rsi, new_line
         call    wypisz_znak
+
 
 exit:
         mov     rax, SYS_EXIT
