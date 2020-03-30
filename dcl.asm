@@ -11,9 +11,13 @@ section .bss
         permut_l resb SIGNS
         permut_r resb SIGNS
         permut_t resb SIGNS
+        permut_l_1 resb SIGNS
+        permut_r_1 resb SIGNS
         klucz_l resb 1
         klucz_r resb 1
         tablica resb SIGNS
+        tekst resb 64
+        szyfrogram resb 64
 
 section .rodata
 
@@ -28,6 +32,23 @@ wczytaj_znak:
         mov     rax, SYS_READ
         mov     rdi, STDIN
         mov     rdx, 1
+        syscall
+        ret
+
+wczytaj_64_znaki_tekstu:
+        mov     rax, SYS_READ
+        mov     rdi, STDIN
+        mov     rdx, 64
+        mov     rsi, tekst
+        syscall
+        ret
+
+wypisz_szyfrogram:
+        
+        mov     rdx, 42
+        mov     rax, SYS_WRITE
+        mov     rdi, STDOUT
+        mov     rsi, szyfrogram
         syscall
         ret
 
@@ -66,10 +87,13 @@ zeruj_tablice:
 
 sprawdz_tablice_t:
         mov     dl, [r10 + r8]          ; biorę to na co wskazuje id (np. 1 --> K)
-        mov     cl, [r10 + rdx - 49]    ; biorę to na co wskazuje to na co wskazuje id (np. K --> 1)
+        sub     rdx, 49
+        cmp     rdx, r8                 ; sprawdzam czy to nie jest cykl 1-elementowy
+        je      niepoprawne_wejscie
+        mov     cl, [r10 + rdx]         ; biorę to na co wskazuje to na co wskazuje id (np. K --> 1)
         sub     cl, 49                  ; poprawka ASCII -- indeks
         cmp     rcx, r8                 ; i sprawdzam czy to drugie == id
-        jne     niepoprawne_wejscie     ; jeśli nie to błąd
+        jne     niepoprawne_wejscie
         add     r8, 1
         cmp     r8, rdi                 ; porównuję czy to ostatni znak
         jne     sprawdz_tablice_t
@@ -106,6 +130,18 @@ petla_przepisz_znak:
         jne     petla_przepisz_znak     ; jeśli nie są równe, to jeszcze wchodzę do pętli
         ret
 
+przepisz_permutacje_1:
+        mov     dl, [rsi + r8]          ; r8 jest licznikiem ktory znak przepisuję
+        mov     r11b, r8b
+        add     r11b, 49
+        mov     [r10 + rdx - 49], r11b
+
+        add     r8, 1
+        cmp     r8, rdi                 ; porównuję czy to ostatni znak, który mam przepisać
+        jne     przepisz_permutacje_1   ; jeśli nie są równe, to jeszcze wchodzę do pętli
+        
+        ret
+
 przepisz_klucze:
         cld                             ; Zwiększaj indeks przy przeszukiwaniu napisu.
         xor     al, al                  ; Szukaj zera.
@@ -126,6 +162,152 @@ przepisz_klucze:
 
 ;-------------------------------------------------------------------------------;
 
+modulo_r8b:
+        sub     r8b, 42
+        ret
+
+modulo_r9b:
+        sub     r9b, 42
+        ret
+
+modulo_al:
+        sub     al, 42
+        ret
+
+modulo_al_minus:
+        add     al, 42
+        ret
+
+add_1_r8b:
+        add     r8b, 1
+        cmp     r8b, cl
+        ja      modulo_r8b
+        ret
+
+ustaw_bebenki:
+        add     r9b, 1                  ; bębenek R się zwiększa zawsze o 1 przed zaszyfrowaniem nowego znaku
+        cmp     r9b, 90
+        ja      modulo_r9b              ; cykliczny obrót bębenka: 91 == 49 == '1'
+
+        mov     cl, 76
+        cmp     r9b, 76                 ; gdy bębenek R wskazuje znak 'L', 'R' lub 'T' obraca się również bębenek L
+        je      add_1_r8b               ; 'L' == 76, 'R' == 82, 'T' == 84
+        mov     cl, 82
+        cmp     r9b, 82                 
+        je      add_1_r8b               
+        mov     cl, 84
+        cmp     r9b, 84                 
+        je      add_1_r8b
+
+        ret
+
+permutuj_Q:
+        add     al, dl                  ; permutacja Q
+        sub     al, 49
+        cmp     al, 90
+        ja      modulo_al
+        ret
+
+permutuj_Q_minus:
+        add     al, 49                  ; permutacja Q
+        sub     al, dl
+        cmp     al, 49
+        jb      modulo_al_minus
+        ret
+
+permutuj_LRT:
+        mov     cl, [rdx + rax - 49]
+        mov     al, cl
+        ret
+
+szyfruj_znak:
+        mov     dl, r9b
+        call    permutuj_Q
+
+        mov     rdx, permut_r
+        call    permutuj_LRT
+
+        mov     dl, r9b
+        call    permutuj_Q_minus
+
+        mov     dl, r8b
+        call    permutuj_Q
+
+        mov     rdx, permut_l
+        call    permutuj_LRT
+
+        mov     dl, r8b
+        call    permutuj_Q_minus
+
+        mov     rdx, permut_t
+        call    permutuj_LRT
+
+        mov     dl, r8b
+        call    permutuj_Q
+
+        mov     rdx, permut_l_1
+        call    permutuj_LRT
+  
+        mov     dl, r8b
+        call    permutuj_Q_minus
+
+    
+        mov     dl, r9b
+        call    permutuj_Q
+
+        mov     rdx, permut_r_1
+        call    permutuj_LRT
+
+        mov     dl, r9b
+        call    permutuj_Q_minus
+
+        ret
+
+szyfruj:
+        call    wczytaj_64_znaki_tekstu
+
+        cld                             ; Zwiększaj indeks przy przeszukiwaniu napisu.
+        xor     al, al                  ; Szukaj zera.
+        mov     ecx, SIGNS+3            ; Ogranicz przeszukiwanie do SIGNS+3 znaków.
+        mov     rdi, rsi                ; Ustaw adres, od którego rozpocząć szukanie.
+        repne \
+        scasb                           ; Szukaj bajtu o wartości zero.
+        sub     rdi, rsi                ; ile bajtów - w rdi był adres znaku konca, a w rsi poczatku
+        push    r12
+        push    r13
+        mov     r12, rdi
+
+        xor     r8, r8
+        xor     r9, r9
+        mov     r8b, [klucz_l]
+        mov     r9b, [klucz_r]
+        mov     r10, tekst
+        mov     r11, szyfrogram
+
+        xor     r13, r13
+        call    petla_szyfruj
+        pop     r13
+        pop     r12
+
+        ret
+
+petla_szyfruj:
+        xor     rax, rax
+        mov     al, [r10 + r13]
+
+        call    ustaw_bebenki
+
+        call    szyfruj_znak
+
+        mov     [r11 + r13], al
+
+        add     r13, 1
+        cmp     r13, r12
+        jne     petla_szyfruj
+        ret
+
+;-------------------------------------------------------------------------------;
+
 _start:
         mov     rsi, [rsp]              ; wczytuję liczbę argumentów, powinno być 5
         cmp     rsi, 5
@@ -135,15 +317,21 @@ _start:
         mov     r9, tablica
 
         mov     rsi, [rsp+16]           ; mam teraz arg1 w rsi
-        mov     r10, permut_l           ; i wskaźnik na permutację L w r9
+        mov     r10, permut_l           ; i wskaźnik na permutację L w r10
         call    przepisz_permutacje
+        xor     r8, r8                  ; stworzę tablicę z permutacją odwrotną do L
+        mov     r10, permut_l_1
+        call    przepisz_permutacje_1
 
         mov     rsi, [rsp+24]           ; mam teraz arg2 w rsi
-        mov     r10, permut_r           ; i wskaźnik na permutację R w r9
+        mov     r10, permut_r           ; i wskaźnik na permutację R w r10
         call    przepisz_permutacje
+        xor     r8, r8                  ; stworzę tablicę z permutacją odwrotną do R
+        mov     r10, permut_r_1
+        call    przepisz_permutacje_1
 
         mov     rsi, [rsp+32]           ; mam teraz arg3 w rsi
-        mov     r10, permut_t           ; i wskaźnik na permutację T w r9
+        mov     r10, permut_t           ; i wskaźnik na permutację T w r10
         call    przepisz_permutacje
         xor     r8, r8
         call    sprawdz_tablice_t       ; sprawdza czy TT jest identycznością
@@ -151,28 +339,11 @@ _start:
         mov     rsi, [rsp+40]           ; mam teraz arg4 w rsi
         call    przepisz_klucze
 
-        ;call    szyfruj                ; wczytuje w blokach i (de)szyfruje tekst
+        call    szyfruj                 ; wczytuje w blokach i (de)szyfruje tekst
 
-        mov     rsi, permut_l
-        call    wypisz_permutacje       ; wypisz permutacje L
+        call    wypisz_szyfrogram      ; wypisz szyfrogram
 
-        mov     rsi, permut_r
-        call    wypisz_permutacje       ; wypisz permutacje R
-
-        mov     rsi, permut_t
-        call    wypisz_permutacje       ; wypisz permutacje T
-
-        mov     rsi, tablica
-        call    wypisz_permutacje       ; wypisz tablicę
-
-        mov     rsi, klucz_l
-        call    wypisz_znak             ; wypisz klucz L
-        mov     rsi, new_line           ; Wypisz znak nowej linii.
-        call    wypisz_znak
-
-        mov     rsi, klucz_r
-        call    wypisz_znak             ; wypisz klucz R
-        mov     rsi, new_line           ; Wypisz znak nowej linii.
+        mov     rsi, new_line          ; Wypisz znak nowej linii.
         call    wypisz_znak
 
 exit:
