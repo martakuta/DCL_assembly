@@ -245,20 +245,24 @@ szyfruj_znak:                           ; szyfruje znak zawarty w rejestrze al
 
         ret
 
-wczytuj_porcje:
+wczytuj_porcje:                         ;wczytuje porcje 60 znaków, szyfruje i wypisuje
         call    wczytaj_60_znakow_tekstu
+        mov     al, [tekst]
+        cmp     al, 0
+        je      exit                    ; zakończ jeśli wczytano pusty fragment
+
         call    szyfruj
         call    wypisz_szyfrogram
 
-        cld                             ; Zwiększaj indeks przy przeszukiwaniu napisu.
-        xor     al, al                  ; Szukaj zera.
-        mov     ecx, 64                 ; Ogranicz przeszukiwanie do SIGNS+3 znaków.
-        mov     rdi, szyfrogram         ; Ustaw adres, od którego rozpocząć szukanie.
+        cld                             ; sprawdź jakiej długości jest szyfrogram
+        xor     al, al                  
+        mov     ecx, 64                 
+        mov     rdi, szyfrogram         
         repne \
         scasb                           ; Szukaj bajtu o wartości zero.
         sub     rdi, szyfrogram     
 
-        mov     r9, szyfrogram
+        mov     r9, szyfrogram          ; zeruje tablice szyfrogram i tekst
         xor     r8, r8
         xor     dl, dl
         call    zeruj_tablice
@@ -267,7 +271,7 @@ wczytuj_porcje:
         xor     dl, dl
         call    zeruj_tablice
         
-        cmp     rdi, 60
+        cmp     rdi, 60                 ; jeśli poprzedni fragment miał 60 znaków, to wczytaj następny
         jae     wczytuj_porcje
 
         ret
@@ -345,11 +349,10 @@ _start:
 
         call    wczytuj_porcje          ; wczytuje w blokach i (de)szyfruje tekst
 
+exit:
         mov     rsi, new_line
         call    wypisz_znak
 
-
-exit:
         mov     rax, SYS_EXIT
         xor     rdi, rdi                ; kod powrotu 0
         syscall
