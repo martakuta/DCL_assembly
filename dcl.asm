@@ -28,7 +28,7 @@ new_line db `\n`
 
 section .text
 
-wczytaj_60_znakow_tekstu:
+wczytaj_6000_znakow_tekstu:
         mov     rax, SYS_READ
         mov     rdi, STDIN
         mov     rdx, 60
@@ -246,7 +246,7 @@ szyfruj_znak:                           ; szyfruje znak zawarty w rejestrze al
         ret
 
 wczytuj_porcje:                         ;wczytuje porcje 60 znaków, szyfruje i wypisuje
-        call    wczytaj_60_znakow_tekstu
+        call    wczytaj_6000_znakow_tekstu
         mov     al, [tekst]
         cmp     al, 0
         je      exit                    ; zakończ jeśli wczytano pusty fragment
